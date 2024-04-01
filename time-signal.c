@@ -28,6 +28,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <getopt.h>
 #include "time-services.h"
 #include "clock-control.h"
+#include <inttypes.h>
+//#include <time.h>
+
+
+// Define Timezone Difference to add to JST when using JJY
+#define TZ_DIFF 1 // add 1hour when in Singapore/Taipei
 
 int usage(const char *msg, const char *progname)
 	{
@@ -129,23 +135,42 @@ struct sched_param sp;
 sp.sched_priority = 99;
 sched_setscheduler(0, SCHED_FIFO, &sp);
 
-now = time(NULL);
-minute_start = now - now % 60; // round to minute
+//time_t now_lc;
+//struct tm *info_lc;
+//time(&now_lc);
+//info_lc = localtime(&now_lc);
 
-while(1)
+//info_lc->tm_hour += 1;
+
+//now = mktime(info_lc);
+
+// Add TZ_DIFF to JST
+now = time(NULL) + TZ_DIFF * 3600;
+//struct tm now_jst = now;
+//now_jst.tm_sec += 3600;
+//mktime(&now_jst);
+minute_start = now - now % 60; // round to minute
+//minute_start = &now_jst - &now_jst % 60; // round to minute
+printf("%ld\n", (long)now);
+//printf("%ld\n", (long)now + TZ_DIFF*3600);
+printf("%ld\n", (long)minute_start);
+
+for(int i = 0; i < 15; i++)
 	{
 	if (carrier_only) continue;
 	localtime_r(&minute_start, &tv);
   	strftime(date_string, sizeof(date_string), "%Y-%m-%d %H:%M:%S", &tv);
 	printf("%s\n",date_string);
 	minute_bits = prepareMinute(service,minute_start);
+	//printf("%" PRIu64 "\n", minute_bits);
 
 	for (int second = 0; second < 60; ++second)
 		{
 		modulation = getModulationForSecond(service,minute_bits,second);
+		//printf("%d\n", modulation);
 			
 		// First, let's wait until we reach the beginning of that second
-		target_wait.tv_sec = minute_start + second;
+		target_wait.tv_sec = minute_start - TZ_DIFF * 3600 + second; // adjust back TZ_DIFF
 		target_wait.tv_nsec = 0;
 		clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &target_wait, NULL);
 		
